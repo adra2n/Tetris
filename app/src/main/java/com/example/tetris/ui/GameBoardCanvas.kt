@@ -87,6 +87,15 @@ fun GameBoardCanvas(state: GameState, modifier: Modifier = Modifier) {
 
         state.currentPiece?.let { piece ->
             val pieceColor = BlockColors[piece.colorIndex]
+            if (state.showGhost && state.ghostY > state.pieceY) {
+                for ((dr, dc) in piece.cells(state.rotation)) {
+                    val row = state.ghostY + dr
+                    val col = state.pieceX + dc
+                    if (row in 0 until GameConfig.BOARD_HEIGHT && col in 0 until GameConfig.BOARD_WIDTH) {
+                        drawGhostBlock(pieceColor, col * cellSize, row * cellSize, cellSize)
+                    }
+                }
+            }
             for ((dr, dc) in piece.cells(state.rotation)) {
                 val row = state.pieceY + dr
                 val col = state.pieceX + dc

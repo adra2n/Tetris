@@ -33,6 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -63,7 +64,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tetris.game.GameState
 import com.example.tetris.game.TetrisViewModel
+import com.example.tetris.game.Tetromino
 import com.example.tetris.ui.theme.Accent
+import com.example.tetris.ui.theme.EmptyCell
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -74,67 +77,102 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
     val inputEnabled = state.isRunning && !state.isPaused && !state.isGameOver
     var showLeaderboard by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     val showNameEntry = state.isGameOver && state.isNewHighScore && !state.scoreSaved
+    val vibConfig = remember(state.vibrationIntensity) { vibrationConfig(state.vibrationIntensity) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        TopBar(
-            state = state,
-            onPause = viewModel::togglePause,
-            onShowLeaderboard = { showLeaderboard = true }
-        )
-
-        Box(
+    CompositionLocalProvider(LocalVibrationConfig provides vibConfig) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentAlignment = Alignment.Center
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            GameBoardCanvas(
+            TopBar(
                 state = state,
-                modifier = Modifier.fillMaxHeight()
+                onPause = viewModel::togglePause,
+                onShowLeaderboard = { showLeaderboard = true },
+                onShowSettings = { showSettings = true }
             )
-            BoardMessages(state = state)
-            if (state.isPaused || state.isGameOver) {
-                PauseOverlay(
-                    isGameOver = state.isGameOver,
-                    score = state.score,
-                    highScore = state.highScore,
-                    isNewHighScore = state.isNewHighScore && state.scoreSaved,
-                    onResume = viewModel::togglePause,
-                    onRestart = viewModel::restart
-                )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    GameBoardCanvas(
+                        state = state,
+                        modifier = Modifier.fillMaxHeight()
+                    )
+                    BoardMessages(state = state)
+                    if (state.isPaused || state.isGameOver) {
+                        PauseOverlay(
+                            isGameOver = state.isGameOver,
+                            score = state.score,
+                            highScore = state.highScore,
+                            isNewHighScore = state.isNewHighScore && state.scoreSaved,
+                            onResume = viewModel::togglePause,
+                            onRestart = viewModel::restart
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    PreviewBox(label = "暂存", piece = state.holdPiece)
+                    PreviewBox(label = "下一个", piece = state.nextPiece)
+                }
             }
+
+            ControlButtons(
+                enabled = inputEnabled,
+                canHold = state.canHold,
+                onMoveLeft = viewModel::moveLeft,
+                onMoveRight = viewModel::moveRight,
+                onRotate = viewModel::rotate,
+                onSoftDrop = viewModel::softDrop,
+                onHardDrop = viewModel::hardDrop,
+                onHold = viewModel::hold
+            )
         }
 
-        ControlButtons(
-            enabled = inputEnabled,
-            onMoveLeft = viewModel::moveLeft,
-            onMoveRight = viewModel::moveRight,
-            onRotate = viewModel::rotate,
-            onSoftDrop = viewModel::softDrop,
-            onHardDrop = viewModel::hardDrop
-        )
-    }
-
-    if (showNameEntry) {
-        NameEntryDialog(
-            score = state.score,
-            onSubmit = { viewModel.submitScore(it) },
-            onSkip = viewModel::skipScore
-        )
-    }
-    if (showLeaderboard) {
-        LeaderboardDialog(
-            scores = state.leaderboard,
-            onDismiss = { showLeaderboard = false }
-        )
+        if (showNameEntry) {
+            NameEntryDialog(
+                score = state.score,
+                onSubmit = { viewModel.submitScore(it) },
+                onSkip = viewModel::skipScore
+            )
+        }
+        if (showLeaderboard) {
+            LeaderboardDialog(
+                scores = state.leaderboard,
+                onDismiss = { showLeaderboard = false }
+            )
+        }
+        if (showSettings) {
+            SettingsDialog(
+                vibrationIntensity = state.vibrationIntensity,
+                startLevel = state.startLevel,
+                showGhost = state.showGhost,
+                onVibrationChange = viewModel::updateVibration,
+                onStartLevelChange = viewModel::updateStartLevel,
+                onShowGhostChange = viewModel::updateShowGhost,
+                onDismiss = { showSettings = false }
+            )
+        }
     }
 }
 
@@ -142,35 +180,23 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
 private fun TopBar(
     state: GameState,
     onPause: () -> Unit,
-    onShowLeaderboard: () -> Unit
+    onShowLeaderboard: () -> Unit,
+    onShowSettings: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "下一个",
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
-            )
-            Spacer(Modifier.height(3.dp))
-            PiecePreviewCanvas(
-                piece = state.nextPiece,
-                modifier = Modifier.size(44.dp)
-            )
-        }
-
         Column(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.Start
         ) {
             Text(
                 text = "${state.score}",
-                fontSize = 26.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -180,16 +206,37 @@ private fun TopBar(
                 MiniStat(label = "最高", value = "${state.highScore}")
             }
         }
-
-        RoundIconButton(
-            text = "🏆",
-            onClick = onShowLeaderboard
-        )
+        RoundIconButton(text = "🏆", onClick = onShowLeaderboard)
+        RoundIconButton(text = "⚙️", onClick = onShowSettings)
         RoundIconButton(
             text = if (state.isPaused) "▶" else "⏸",
             onClick = onPause,
             enabled = state.isRunning && !state.isGameOver
         )
+    }
+}
+
+@Composable
+private fun PreviewBox(label: String, piece: Tetromino?) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+        )
+        if (piece != null) {
+            PiecePreviewCanvas(piece = piece, modifier = Modifier.size(44.dp))
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(EmptyCell)
+            )
+        }
     }
 }
 
@@ -218,8 +265,12 @@ private fun RoundIconButton(
     modifier: Modifier = Modifier
 ) {
     val vibrator = rememberVibrator()
+    val vibConfig = LocalVibrationConfig.current
     IconButton(
-        onClick = { vibrator?.tap(); onClick() },
+        onClick = {
+            if (vibConfig.enabled) vibrator?.tap(vibConfig.durationMs, vibConfig.amplitude)
+            onClick()
+        },
         enabled = enabled,
         modifier = modifier
             .size(40.dp)
@@ -314,11 +365,13 @@ private fun BoardMessages(state: GameState) {
 @Composable
 private fun ControlButtons(
     enabled: Boolean,
+    canHold: Boolean,
     onMoveLeft: () -> Unit,
     onMoveRight: () -> Unit,
     onRotate: () -> Unit,
     onSoftDrop: () -> Unit,
-    onHardDrop: () -> Unit
+    onHardDrop: () -> Unit,
+    onHold: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -377,14 +430,27 @@ private fun ControlButtons(
             }
         }
 
-        GameButton(
-            text = "↻\n旋转",
-            onClick = onRotate,
-            enabled = enabled,
-            modifier = Modifier.size(100.dp),
-            primary = true,
-            shape = CircleShape
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            GameButton(
+                text = "↻\n旋转",
+                onClick = onRotate,
+                enabled = enabled,
+                modifier = Modifier.size(92.dp),
+                primary = true,
+                shape = CircleShape
+            )
+            GameButton(
+                text = "暂存",
+                onClick = onHold,
+                enabled = enabled && canHold,
+                modifier = Modifier.size(64.dp),
+                primary = false,
+                shape = CircleShape
+            )
+        }
     }
 }
 
@@ -404,6 +470,7 @@ private fun GameButton(
     val scope = rememberCoroutineScope()
     val vibrator = rememberVibrator()
     val haptic = LocalHapticFeedback.current
+    val vibConfig = LocalVibrationConfig.current
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
         targetValue = if (isPressed) 0.95f else 1f,
@@ -418,8 +485,10 @@ private fun GameButton(
             when (interaction) {
                 is PressInteraction.Press -> {
                     if (currentEnabled) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        vibrator?.tap()
+                        if (vibConfig.enabled) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            vibrator?.tap(vibConfig.durationMs, vibConfig.amplitude)
+                        }
                         if (repeat) {
                             currentOnClick()
                             repeatJob?.cancel()
