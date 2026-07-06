@@ -132,20 +132,17 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    PreviewBox(label = "暂存", piece = state.holdPiece)
                     PreviewBox(label = "下一个", piece = state.nextPiece)
                 }
             }
 
             ControlButtons(
                 enabled = inputEnabled,
-                canHold = state.canHold,
                 onMoveLeft = viewModel::moveLeft,
                 onMoveRight = viewModel::moveRight,
                 onRotate = viewModel::rotate,
                 onSoftDrop = viewModel::softDrop,
-                onHardDrop = viewModel::hardDrop,
-                onHold = viewModel::hold
+                onHardDrop = viewModel::hardDrop
             )
         }
 
@@ -365,13 +362,11 @@ private fun BoardMessages(state: GameState) {
 @Composable
 private fun ControlButtons(
     enabled: Boolean,
-    canHold: Boolean,
     onMoveLeft: () -> Unit,
     onMoveRight: () -> Unit,
     onRotate: () -> Unit,
     onSoftDrop: () -> Unit,
-    onHardDrop: () -> Unit,
-    onHold: () -> Unit
+    onHardDrop: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -430,27 +425,14 @@ private fun ControlButtons(
             }
         }
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            GameButton(
-                text = "↻\n旋转",
-                onClick = onRotate,
-                enabled = enabled,
-                modifier = Modifier.size(92.dp),
-                primary = true,
-                shape = CircleShape
-            )
-            GameButton(
-                text = "暂存",
-                onClick = onHold,
-                enabled = enabled && canHold,
-                modifier = Modifier.size(64.dp),
-                primary = false,
-                shape = CircleShape
-            )
-        }
+        GameButton(
+            text = "↻\n旋转",
+            onClick = onRotate,
+            enabled = enabled,
+            modifier = Modifier.size(100.dp),
+            primary = true,
+            shape = CircleShape
+        )
     }
 }
 

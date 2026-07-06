@@ -34,8 +34,6 @@ data class GameState(
     val lastClearLines: Int = 0,
     val clearEventId: Int = 0,
     val levelUpEventId: Int = 0,
-    val holdPiece: Tetromino? = null,
-    val canHold: Boolean = true,
     val startLevel: Int = 1,
     val showGhost: Boolean = false,
     val vibrationIntensity: Int = 2
@@ -96,8 +94,6 @@ class TetrisViewModel(application: Application) : AndroidViewModel(application) 
                 isRunning = true,
                 isPaused = false,
                 isGameOver = false,
-                holdPiece = null,
-                canHold = true,
                 startLevel = s.startLevel,
                 showGhost = s.showGhost,
                 vibrationIntensity = s.vibrationIntensity
@@ -178,7 +174,6 @@ class TetrisViewModel(application: Application) : AndroidViewModel(application) 
             lines = newLines,
             clearingRows = emptyList(),
             isClearing = false,
-            canHold = true,
             lastClearLines = cleared,
             clearEventId = s.clearEventId + if (cleared > 0) 1 else 0,
             levelUpEventId = s.levelUpEventId + if (levelUp) 1 else 0
@@ -267,50 +262,6 @@ class TetrisViewModel(application: Application) : AndroidViewModel(application) 
             emit(s.copy(pieceY = dropY, grid = board.snapshot()))
         }
         lockPiece()
-    }
-
-    fun hold() {
-        val s = _state.value
-        if (!canInput(s) || !s.canHold) return
-        val current = s.currentPiece ?: return
-        val spawnX = GameState.SPAWN_X
-        val spawnY = 0
-        val newHold = current
-        val newCurrent: Tetromino
-        val newNext: Tetromino
-        if (s.holdPiece == null) {
-            newCurrent = s.nextPiece
-            newNext = drawNext()
-        } else {
-            newCurrent = s.holdPiece
-            newNext = s.nextPiece
-        }
-        if (!board.isValid(newCurrent, 0, spawnX, spawnY)) {
-            val qualified = repository.isHighScore(s.score)
-            emit(
-                s.copy(
-                    currentPiece = null,
-                    holdPiece = newHold,
-                    canHold = false,
-                    isGameOver = true,
-                    isRunning = false,
-                    isNewHighScore = qualified,
-                    scoreSaved = !qualified
-                )
-            )
-            return
-        }
-        emit(
-            s.copy(
-                currentPiece = newCurrent,
-                rotation = 0,
-                pieceX = spawnX,
-                pieceY = spawnY,
-                nextPiece = newNext,
-                holdPiece = newHold,
-                canHold = false
-            )
-        )
     }
 
     fun togglePause() {
