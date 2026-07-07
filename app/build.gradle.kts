@@ -16,6 +16,14 @@ android {
         versionName = "3.11"
     }
 
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            output.outputFileName = "Tetris-v${variant.versionName}.apk"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
