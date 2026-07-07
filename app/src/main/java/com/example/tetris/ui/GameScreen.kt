@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -13,22 +14,18 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -53,6 +51,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -66,6 +65,8 @@ import com.example.tetris.game.GameState
 import com.example.tetris.game.TetrisViewModel
 import com.example.tetris.game.Tetromino
 import com.example.tetris.ui.theme.Accent
+import com.example.tetris.ui.theme.AppGradientBottom
+import com.example.tetris.ui.theme.AppGradientTop
 import com.example.tetris.ui.theme.EmptyCell
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -85,18 +86,15 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(AppGradientTop, AppGradientBottom)
+                    )
+                )
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 10.dp, vertical = 2.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            TopBar(
-                state = state,
-                onPause = viewModel::togglePause,
-                onShowLeaderboard = { showLeaderboard = true },
-                onShowSettings = { showSettings = true }
-            )
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -106,7 +104,7 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
             ) {
                 Box(
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(8f)
                         .fillMaxHeight(),
                     contentAlignment = Alignment.Center
                 ) {
@@ -127,13 +125,13 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
                     }
                 }
 
-                Column(
-                    modifier = Modifier.fillMaxHeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    PreviewBox(label = "下一个", piece = state.nextPiece)
-                }
+                InfoPanel(
+                    state = state,
+                    onPause = viewModel::togglePause,
+                    onShowLeaderboard = { showLeaderboard = true },
+                    onShowSettings = { showSettings = true },
+                    modifier = Modifier.weight(2f).fillMaxHeight()
+                )
             }
 
             ControlButtons(
@@ -174,63 +172,58 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
 }
 
 @Composable
-private fun TopBar(
+private fun InfoPanel(
     state: GameState,
     onPause: () -> Unit,
     onShowLeaderboard: () -> Unit,
-    onShowSettings: () -> Unit
+    onShowSettings: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            horizontalAlignment = Alignment.Start
-        ) {
-            Text(
-                text = "${state.score}",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                MiniStat(label = "等级", value = "${state.level}")
-                MiniStat(label = "行数", value = "${state.lines}")
-                MiniStat(label = "最高", value = "${state.highScore}")
-            }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            RoundIconButton(text = "🏆", onClick = onShowLeaderboard)
+            RoundIconButton(text = "⚙️", onClick = onShowSettings)
         }
-        RoundIconButton(text = "🏆", onClick = onShowLeaderboard)
-        RoundIconButton(text = "⚙️", onClick = onShowSettings)
-        RoundIconButton(
+
+        GameButton(
             text = if (state.isPaused) "▶" else "⏸",
             onClick = onPause,
-            enabled = state.isRunning && !state.isGameOver
+            enabled = state.isRunning && !state.isGameOver,
+            modifier = Modifier.size(64.dp),
+            primary = true,
+            shape = CircleShape
         )
+
+        NextPreview(piece = state.nextPiece)
+
+        InfoStat(label = "分数", value = "${state.score}", color = Color(0xFFFFC107))
+        InfoStat(label = "最高", value = "${state.highScore}", color = Color(0xFFFF80AB))
+        InfoStat(label = "等级", value = "${state.level}", color = MaterialTheme.colorScheme.onBackground)
     }
 }
 
 @Composable
-private fun PreviewBox(label: String, piece: Tetromino?) {
+private fun NextPreview(piece: Tetromino?) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = label,
-            fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+            text = "下一个",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
         )
         if (piece != null) {
-            PiecePreviewCanvas(piece = piece, modifier = Modifier.size(44.dp))
+            PiecePreviewCanvas(piece = piece, modifier = Modifier.size(56.dp))
         } else {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(EmptyCell)
             )
         }
@@ -238,18 +231,18 @@ private fun PreviewBox(label: String, piece: Tetromino?) {
 }
 
 @Composable
-private fun MiniStat(label: String, value: String) {
+private fun InfoStat(label: String, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = label,
-            fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
         )
         Text(
             text = value,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = color
         )
     }
 }
@@ -270,7 +263,7 @@ private fun RoundIconButton(
         },
         enabled = enabled,
         modifier = modifier
-            .size(40.dp)
+            .size(36.dp)
             .background(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp)
@@ -278,8 +271,8 @@ private fun RoundIconButton(
     ) {
         Text(
             text = text,
-             fontSize = 17.sp,
-             color = MaterialTheme.colorScheme.onSurfaceVariant
+            fontSize = 17.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -371,66 +364,44 @@ private fun ControlButtons(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 14.dp, top = 4.dp),
+            .padding(bottom = 8.dp, top = 2.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val btnSize = 64.dp
-        val center = 32.dp
-        val gap = 4.dp
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(gap)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                Spacer(Modifier.size(center))
-                GameButton(
-                    text = "↑",
-                    onClick = onHardDrop,
-                    enabled = enabled,
-                    modifier = Modifier.size(btnSize),
-                    primary = true
-                )
-                Spacer(Modifier.size(center))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                GameButton(
-                    text = "←",
-                    onClick = onMoveLeft,
-                    enabled = enabled,
-                    modifier = Modifier.size(btnSize),
-                    repeat = true
-                )
-                Spacer(Modifier.size(center))
-                GameButton(
-                    text = "→",
-                    onClick = onMoveRight,
-                    enabled = enabled,
-                    modifier = Modifier.size(btnSize),
-                    repeat = true
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                Spacer(Modifier.size(center))
-                GameButton(
-                    text = "↓",
-                    onClick = onSoftDrop,
-                    enabled = enabled,
-                    modifier = Modifier.size(btnSize),
-                    repeat = true,
-                    repeatDelay = 40L,
-                    initialDelay = 140L
-                )
-                Spacer(Modifier.size(center))
-            }
-        }
-
         GameButton(
-            text = "↻\n旋转",
+            text = "←",
+            onClick = onMoveLeft,
+            enabled = enabled,
+            modifier = Modifier.size(64.dp),
+            repeat = true,
+            buttonColor = Color(0xFF3B82F6),
+            shape = CircleShape
+        )
+        GameButton(
+            text = "↓",
+            onClick = onSoftDrop,
+            onLongPress = onHardDrop,
+            enabled = enabled,
+            modifier = Modifier.size(64.dp),
+            buttonColor = Color(0xFFF59E0B),
+            shape = CircleShape,
+            initialDelay = 200L
+        )
+        GameButton(
+            text = "→",
+            onClick = onMoveRight,
+            enabled = enabled,
+            modifier = Modifier.size(64.dp),
+            repeat = true,
+            buttonColor = Color(0xFF3B82F6),
+            shape = CircleShape
+        )
+        GameButton(
+            text = "↻",
             onClick = onRotate,
             enabled = enabled,
-            modifier = Modifier.size(100.dp),
-            primary = true,
+            modifier = Modifier.size(64.dp),
+            buttonColor = Color(0xFF8B5CF6),
             shape = CircleShape
         )
     }
@@ -446,7 +417,10 @@ private fun GameButton(
     primary: Boolean = false,
     shape: Shape = RoundedCornerShape(16.dp),
     repeatDelay: Long = 60L,
-    initialDelay: Long = 160L
+    initialDelay: Long = 160L,
+    buttonColor: Color? = null,
+    onRepeat: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val scope = rememberCoroutineScope()
@@ -455,11 +429,14 @@ private fun GameButton(
     val vibConfig = LocalVibrationConfig.current
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
+        targetValue = if (isPressed) 0.88f else 1f,
         label = "pressScale"
     )
     var repeatJob by remember { mutableStateOf<Job?>(null) }
+    var longPressJob by remember { mutableStateOf<Job?>(null) }
     val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnRepeat by rememberUpdatedState(onRepeat)
+    val currentOnLongPress by rememberUpdatedState(onLongPress)
     val currentEnabled by rememberUpdatedState(enabled)
 
     LaunchedEffect(interactionSource) {
@@ -477,9 +454,21 @@ private fun GameButton(
                             repeatJob = scope.launch {
                                 delay(initialDelay)
                                 while (isActive) {
-                                    currentOnClick()
+                                    val action = currentOnRepeat ?: currentOnClick
+                                    action()
                                     delay(repeatDelay)
                                 }
+                            }
+                        } else if (currentOnLongPress != null) {
+                            currentOnClick()
+                            longPressJob?.cancel()
+                            longPressJob = scope.launch {
+                                delay(initialDelay)
+                                if (vibConfig.enabled) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    vibrator?.tap(vibConfig.durationMs, vibConfig.amplitude)
+                                }
+                                currentOnLongPress?.invoke()
                             }
                         }
                     }
@@ -487,23 +476,32 @@ private fun GameButton(
                 is PressInteraction.Release, is PressInteraction.Cancel -> {
                     repeatJob?.cancel()
                     repeatJob = null
+                    longPressJob?.cancel()
+                    longPressJob = null
                 }
             }
         }
     }
 
-    val baseColor = if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val onColor = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-    val topColor = lerp(baseColor, Color.White, 0.25f)
-    val bottomColor = lerp(baseColor, Color.Black, 0.08f)
-    val pressedTop = lerp(baseColor, Color.White, 0.08f)
-    val pressedBottom = lerp(baseColor, Color.Black, 0.3f)
+    val baseColor = buttonColor
+        ?: if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val onColor = if (buttonColor != null) Color.White
+        else if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+
+    val elevation = if (isPressed) 2.dp else 10.dp
+
+    val topColor = lerp(baseColor, Color.White, 0.35f)
+    val midColor = baseColor
+    val bottomColor = lerp(baseColor, Color.Black, 0.25f)
+    val pressedTop = lerp(baseColor, Color.White, 0.12f)
+    val pressedMid = lerp(baseColor, Color.Black, 0.1f)
+    val pressedBottom = lerp(baseColor, Color.Black, 0.45f)
+
     val brush = if (isPressed) {
-        Brush.verticalGradient(colors = listOf(pressedTop, pressedBottom))
+        Brush.verticalGradient(colors = listOf(pressedTop, pressedMid, pressedBottom))
     } else {
-        Brush.verticalGradient(colors = listOf(topColor, bottomColor))
+        Brush.verticalGradient(colors = listOf(topColor, midColor, bottomColor))
     }
-    val elevation = if (isPressed) 2.dp else 8.dp
 
     Box(
         modifier = modifier
@@ -512,19 +510,31 @@ private fun GameButton(
             .shadow(elevation = elevation, shape = shape, clip = false)
             .background(brush = brush, shape = shape)
             .clip(shape)
+            .drawWithContent {
+                drawContent()
+                if (!isPressed) {
+                    drawArc(
+                        color = Color.White.copy(alpha = 0.25f),
+                        startAngle = 200f,
+                        sweepAngle = 140f,
+                        useCenter = false,
+                        style = Stroke(width = 2.dp.toPx())
+                    )
+                }
+            }
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 enabled = enabled,
-                onClick = if (repeat) ({}) else onClick
+                onClick = if (repeat || currentOnLongPress != null) ({}) else onClick
             ),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             color = onColor,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
     }
