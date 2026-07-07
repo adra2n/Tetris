@@ -270,6 +270,12 @@ class TetrisViewModel(application: Application) : AndroidViewModel(application) 
         emit(s.copy(isPaused = !s.isPaused, grid = board.snapshot()))
     }
 
+    fun pauseIfRunning() {
+        val s = _state.value
+        if (!s.isRunning || s.isGameOver || s.isPaused) return
+        emit(s.copy(isPaused = true, grid = board.snapshot()))
+    }
+
     fun restart() {
         startGame()
     }
