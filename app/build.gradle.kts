@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.tetris"
         minSdk = 24
         targetSdk = 34
-        versionCode = 10
-        versionName = "3.4"
+        versionCode = 16
+        versionName = "3.10"
     }
 
     buildTypes {

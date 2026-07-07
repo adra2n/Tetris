@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -47,6 +49,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -67,6 +70,7 @@ import com.example.tetris.game.Tetromino
 import com.example.tetris.ui.theme.Accent
 import com.example.tetris.ui.theme.AppGradientBottom
 import com.example.tetris.ui.theme.AppGradientTop
+import com.example.tetris.ui.theme.BlockColors
 import com.example.tetris.ui.theme.EmptyCell
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -83,7 +87,7 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
     val vibConfig = remember(state.vibrationIntensity) { vibrationConfig(state.vibrationIntensity) }
 
     CompositionLocalProvider(LocalVibrationConfig provides vibConfig) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
@@ -91,10 +95,16 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
                         colors = listOf(AppGradientTop, AppGradientBottom)
                     )
                 )
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 10.dp, vertical = 2.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            BackgroundPattern(modifier = Modifier.fillMaxSize())
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(horizontal = 10.dp, vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -142,34 +152,85 @@ fun GameScreen(viewModel: TetrisViewModel = viewModel()) {
                 onSoftDrop = viewModel::softDrop,
                 onHardDrop = viewModel::hardDrop
             )
-        }
+            }
 
-        if (showNameEntry) {
-            NameEntryDialog(
-                score = state.score,
-                onSubmit = { viewModel.submitScore(it) },
-                onSkip = viewModel::skipScore
-            )
-        }
-        if (showLeaderboard) {
-            LeaderboardDialog(
-                scores = state.leaderboard,
-                onDismiss = { showLeaderboard = false }
-            )
-        }
-        if (showSettings) {
-            SettingsDialog(
-                vibrationIntensity = state.vibrationIntensity,
-                startLevel = state.startLevel,
-                showGhost = state.showGhost,
-                onVibrationChange = viewModel::updateVibration,
-                onStartLevelChange = viewModel::updateStartLevel,
-                onShowGhostChange = viewModel::updateShowGhost,
-                onDismiss = { showSettings = false }
-            )
+            if (showNameEntry) {
+                NameEntryDialog(
+                    score = state.score,
+                    onSubmit = { viewModel.submitScore(it) },
+                    onSkip = viewModel::skipScore
+                )
+            }
+            if (showLeaderboard) {
+                LeaderboardDialog(
+                    scores = state.leaderboard,
+                    onDismiss = { showLeaderboard = false }
+                )
+            }
+            if (showSettings) {
+                SettingsDialog(
+                    vibrationIntensity = state.vibrationIntensity,
+                    startLevel = state.startLevel,
+                    showGhost = state.showGhost,
+                    onVibrationChange = viewModel::updateVibration,
+                    onStartLevelChange = viewModel::updateStartLevel,
+                    onShowGhostChange = viewModel::updateShowGhost,
+                    onDismiss = { showSettings = false }
+                )
+            }
         }
     }
 }
+
+@Composable
+private fun BackgroundPattern(modifier: Modifier = Modifier) {
+    val pattern = remember {
+        val rng = kotlin.random.Random(42)
+        val pieces = Tetromino.entries
+        val items = mutableListOf<BgPiece>()
+        val cols = 5
+        val rows = 9
+        val cellSize = 1f / cols
+        for (i in 0 until 18) {
+            val piece = pieces.random(rng)
+            val rotation = rng.nextInt(4)
+            val colorIndex = piece.colorIndex
+            val col = rng.nextInt(cols)
+            val row = rng.nextInt(rows)
+            val alpha = 0.06f + rng.nextFloat() * 0.06f
+            items.add(BgPiece(piece, rotation, colorIndex, col, row, alpha))
+        }
+        items
+    }
+
+    Canvas(modifier = modifier) {
+        val cellSize = size.minDimension / 10f
+        for (item in pattern) {
+            val color = BlockColors[item.colorIndex].copy(alpha = item.alpha)
+            val offsetX = item.col * cellSize * 1.8f
+            val offsetY = item.row * cellSize * 1.5f
+            for ((dr, dc) in item.piece.cells(item.rotation)) {
+                val x = offsetX + dc * cellSize
+                val y = offsetY + dr * cellSize
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(x, y),
+                    size = Size(cellSize * 0.92f, cellSize * 0.92f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cellSize * 0.15f)
+                )
+            }
+        }
+    }
+}
+
+private data class BgPiece(
+    val piece: Tetromino,
+    val rotation: Int,
+    val colorIndex: Int,
+    val col: Int,
+    val row: Int,
+    val alpha: Float
+)
 
 @Composable
 private fun InfoPanel(
@@ -365,18 +426,23 @@ private fun ControlButtons(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp, top = 2.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.Bottom
     ) {
-        GameButton(
-            text = "←",
-            onClick = onMoveLeft,
-            enabled = enabled,
-            modifier = Modifier.size(64.dp),
-            repeat = true,
-            buttonColor = Color(0xFF3B82F6),
-            shape = CircleShape
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            GameButton(
+                text = "←",
+                onClick = onMoveLeft,
+                enabled = enabled,
+                modifier = Modifier.size(64.dp),
+                repeat = true,
+                buttonColor = Color(0xFF3B82F6),
+                shape = CircleShape
+            )
+            Spacer(Modifier.height(52.dp))
+        }
         GameButton(
             text = "↓",
             onClick = onSoftDrop,
@@ -387,15 +453,21 @@ private fun ControlButtons(
             shape = CircleShape,
             initialDelay = 200L
         )
-        GameButton(
-            text = "→",
-            onClick = onMoveRight,
-            enabled = enabled,
-            modifier = Modifier.size(64.dp),
-            repeat = true,
-            buttonColor = Color(0xFF3B82F6),
-            shape = CircleShape
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            GameButton(
+                text = "→",
+                onClick = onMoveRight,
+                enabled = enabled,
+                modifier = Modifier.size(64.dp),
+                repeat = true,
+                buttonColor = Color(0xFF3B82F6),
+                shape = CircleShape
+            )
+            Spacer(Modifier.height(52.dp))
+        }
+        Spacer(Modifier.weight(1f))
         GameButton(
             text = "↻",
             onClick = onRotate,
